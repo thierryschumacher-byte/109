@@ -1,0 +1,19 @@
+git 
+
+git clone <url>.git 
+git add .               <--git pull
+git commit initial
+git push
+
+
+Docker
+Bereich	                     Inhalt	            Quellen / Plattformen
+GIT	                         index.html	        GitHub, GitLab
+CR (Container Registry)	     nginx, alpine	    DockerHub, GitHub, GitLab
+
+docker build -f Dockerfile.web -t ghcr.io/<githubusername>/web:v1 .
+docker push <tag>
+docker run -d -p 8080:80 --name web <tag>
+docker stop web
+docker rmi <tag>
+docker ps -a
