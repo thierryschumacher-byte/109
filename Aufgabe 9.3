@@ -1,0 +1,277 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: petclinic-app
+  annotations:
+    description: "Spring Petclinic Application with MySQL and phpMyAdmin"
+parameters:
+  - name: SOURCE_IMAGE_URL
+    description: URL zum Image der Application
+    value: "ghcr.io/alexandreroman/spring-petclinic:latest"
+  - name: DATABASE_HOST
+    description: Hostname der MySQL-Datenbank
+    value: "petclinic-app-mysql"
+  - name: MYSQL_DATABASE
+    description: Name der MySQL-Datenbank
+    value: "petclinic"
+  - name: MYSQL_USER
+    description: MySQL Benutzername
+    value: "petclinic"
+  - name: MYSQL_PASSWORD
+    description: MySQL Passwort
+    value: "petclinic"
+  - name: MYSQL_ROOT_PASSWORD
+    description: MySQL Root Passwort
+    value: "rootpassword"
+
+objects:
+
+# -------------------------------------------------------
+# Secret
+# -------------------------------------------------------
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: petclinic-app-mysql
+  stringData:
+    DATABASE_HOST: "${DATABASE_HOST}"
+    MYSQL_DATABASE: "${MYSQL_DATABASE}"
+    MYSQL_USER: "${MYSQL_USER}"
+    MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
+    MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+
+# -------------------------------------------------------
+# PersistentVolumeClaim
+# -------------------------------------------------------
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: petclinic-app-pvc-mysql
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+    storageClassName: rbd-storagepool-cluster
+    volumeMode: Filesystem
+
+# -------------------------------------------------------
+# Deployment: MySQL
+# -------------------------------------------------------
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: petclinic-app-mysql
+    labels:
+      app: petclinic-app-mysql
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: petclinic-app-mysql
+    template:
+      metadata:
+        labels:
+          app: petclinic-app-mysql
+      spec:
+        containers:
+          - name: mysql
+            image: mysql:8.0
+            ports:
+              - containerPort: 3306
+                protocol: TCP
+            env:
+              - name: MYSQL_DATABASE
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_DATABASE
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_USER
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_PASSWORD
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_ROOT_PASSWORD
+            volumeMounts:
+              - name: petclinic-app-mysql-data
+                mountPath: /var/lib/mysql
+            resources: {}
+        volumes:
+          - name: petclinic-app-mysql-data
+            persistentVolumeClaim:
+              claimName: petclinic-app-pvc-mysql
+
+# -------------------------------------------------------
+# Deployment: Frontend
+# -------------------------------------------------------
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: petclinic-app-frontend
+    labels:
+      app: petclinic-app-frontend
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: petclinic-app-frontend
+    template:
+      metadata:
+        labels:
+          app: petclinic-app-frontend
+      spec:
+        containers:
+          - name: frontend
+            image: "${SOURCE_IMAGE_URL}"
+            ports:
+              - containerPort: 8080
+                protocol: TCP
+            env:
+              - name: MYSQL_URL
+                value: "jdbc:mysql://${DATABASE_HOST}:3306/${MYSQL_DATABASE}"
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_USER
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_PASSWORD
+            resources: {}
+
+# -------------------------------------------------------
+# Deployment: phpMyAdmin
+# -------------------------------------------------------
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: petclinic-app-phpmyadmin
+    labels:
+      app: petclinic-app-phpmyadmin
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: petclinic-app-phpmyadmin
+    template:
+      metadata:
+        labels:
+          app: petclinic-app-phpmyadmin
+      spec:
+        containers:
+          - name: phpmyadmin
+            image: phpmyadmin:latest
+            ports:
+              - containerPort: 8080
+                protocol: TCP
+            env:
+              - name: PMA_HOST
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: DATABASE_HOST
+              - name: MYSQL_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_USER
+              - name: MYSQL_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_PASSWORD
+              - name: MYSQL_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: petclinic-app-mysql
+                    key: MYSQL_ROOT_PASSWORD
+            resources: {}
+
+# -------------------------------------------------------
+# Service: MySQL
+# -------------------------------------------------------
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: petclinic-app-mysql
+  spec:
+    selector:
+      app: petclinic-app-mysql
+    ports:
+      - port: 3306
+        targetPort: 3306
+        protocol: TCP
+
+# -------------------------------------------------------
+# Service: Frontend
+# -------------------------------------------------------
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: petclinic-app-frontend
+  spec:
+    selector:
+      app: petclinic-app-frontend
+    ports:
+      - port: 8080
+        targetPort: 8080
+        protocol: TCP
+
+# -------------------------------------------------------
+# Service: phpMyAdmin
+# -------------------------------------------------------
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: petclinic-app-phpmyadmin
+  spec:
+    selector:
+      app: petclinic-app-phpmyadmin
+    ports:
+      - port: 8080
+        targetPort: 8080
+        protocol: TCP
+
+# -------------------------------------------------------
+# Route: Frontend
+# -------------------------------------------------------
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: petclinic-app-frontend
+  spec:
+    to:
+      kind: Service
+      name: petclinic-app-frontend
+    port:
+      targetPort: 8080
+    tls:
+      termination: edge
+
+# -------------------------------------------------------
+# Route: phpMyAdmin
+# -------------------------------------------------------
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: petclinic-app-phpmyadmin
+  spec:
+    to:
+      kind: Service
+      name: petclinic-app-phpmyadmin
+    port:
+      targetPort: 8080
+    tls:
+      termination: edge
