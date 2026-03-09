@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      volumes:
+        - name: mysqlvolume
+          persistentVolumeClaim:
+            claimName: mysqlvolume
+      containers:
+        - name: mariadb
+          image: mariadb
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysqlvolume
+              mountPath: /var/lib/mysql
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysqlpassword
+                  key: password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quotes
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quotes
+  template:
+    metadata:
+      labels:
+        app: quotes
+    spec:
+      containers:
+        - name: quotes
+          image: quay.io/donschenck/quotes:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 10000
+              protocol: TCP
+          env:
+            - name: DB_SERVICE_NAME
+              value: mysql
+          resources:
+            limits:
+              cpu: '2'
+            requests:
+              cpu: '1'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quotesweb
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quotesweb
+  template:
+    metadata:
+      labels:
+        app: quotesweb
+    spec:
+      containers:
+        - name: quotesweb
+          image: quay.io/donschenck/quotesweb:v1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              protocol: TCP
