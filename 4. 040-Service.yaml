@@ -1,0 +1,32 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: mysql
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  selector:
+    app: mysql
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: quotes
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  ports:
+    - name: 10000-tcp
+      port: 10000
+      protocol: TCP
+      targetPort: 10000
+    - name: 8443-tcp
+      port: 8443
+      protocol: TCP
+      targetPort: 8443
