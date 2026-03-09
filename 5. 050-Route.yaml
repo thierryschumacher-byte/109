@@ -1,0 +1,33 @@
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: quotes
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  port:
+    targetPort: 10000-tcp
+  to:
+    kind: Service
+    name: quotes
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: quotesweb
+  labels:
+    app: quotes-app
+    app.kubernetes.io/part-of: quotes-app
+spec:
+  port:
+    targetPort: 3000-tcp
+  to:
+    kind: Service
+    name: quotesweb
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
